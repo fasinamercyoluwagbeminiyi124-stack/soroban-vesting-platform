@@ -199,10 +199,24 @@ Read a schedule by ID.
 
 Claimable amount for a schedule.
 
-**Path params:** `id` (string, required) — echoed as `scheduleId` with no
-format validation in this handler.
+**Path params:** `id` (string, required) — a positive integer in the `u64`
+range.
 
-**Success `200`**
+When `VESTING_CONTRACT_ID` and `SOURCE_SECRET_KEY` are configured, the route
+simulates `get_claimable(schedule_id)` against the contract and returns the
+on-chain `i128` amount as a decimal string. If either variable is absent, it
+returns the documented stub amount (`0`).
+
+**Success `200` — live response**
+
+```json
+{
+  "success": true,
+  "data": { "scheduleId": 1, "claimableAmount": "42000", "contractId": "C..." }
+}
+```
+
+Stub response:
 
 ```json
 {
@@ -211,7 +225,7 @@ format validation in this handler.
 }
 ```
 
-**Errors:** `400` `contractId is required`.
+**Errors:** `400` `scheduleId must be a positive u64 integer`.
 
 ### `POST /api/vesting/claim`
 

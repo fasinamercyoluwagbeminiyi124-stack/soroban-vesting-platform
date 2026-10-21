@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed — 2026-10-21
 
+- backend/src/routes/vesting.js: `GET /api/vesting/claimable/:id` now simulates
+  `get_claimable` and returns the live on-chain amount when
+  `VESTING_CONTRACT_ID` and `SOURCE_SECRET_KEY` are configured. It falls back
+  to the existing stub if either setting is absent; `docs/api.md` documents
+  both response shapes.
+
 - Makefile: `setup` target now installs `wasm32v1-none` instead of the
   outdated `wasm32-unknown-unknown` target (#59).
 

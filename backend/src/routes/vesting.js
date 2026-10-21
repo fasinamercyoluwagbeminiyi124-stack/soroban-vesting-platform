@@ -15,8 +15,9 @@
  */
 
 const { Router } = require('express');
+const { Keypair, nativeToScVal, scValToNative } = require('@stellar/stellar-sdk');
 const logger = require('../logger');
-const { validateStellarAddress } = require('../services/stellar');
+const { simulateContractCall, validateStellarAddress } = require('../services/stellar');
 
 const router = Router();
 
@@ -69,12 +70,45 @@ router.get('/schedule/:id', contractIdMiddleware, async (req, res, next) => {
 /**
  * GET /api/vesting/claimable/:id
  */
-router.get('/claimable/:id', contractIdMiddleware, async (req, res, next) => {
+router.get('/claimable/:id', async (req, res, next) => {
   try {
+    const rawId = req.params.id;
+    if (!/^\d+$/.test(rawId)) {
+      return res.status(400).json({ error: 'scheduleId must be a positive u64 integer' });
+    }
+
+    const scheduleId = BigInt(rawId);
+    if (scheduleId <= 0n || scheduleId > 18446744073709551615n) {
+      return res.status(400).json({ error: 'scheduleId must be a positive u64 integer' });
+    }
+
+    const contractId = process.env.VESTING_CONTRACT_ID || '';
+    const sourceSecret = process.env.SOURCE_SECRET_KEY || '';
+
+    if (contractId && sourceSecret) {
+      const sourceKeypair = Keypair.fromSecret(sourceSecret);
+      const simResult = await simulateContractCall({
+        contractId,
+        method: 'get_claimable',
+        args: [nativeToScVal(scheduleId, { type: 'u64' })],
+        sourceKeypair,
+      });
+      const claimableAmount = scValToNative(simResult.result.retval);
+
+      return res.json({
+        success: true,
+        data: {
+          scheduleId: Number(scheduleId),
+          claimableAmount: claimableAmount.toString(),
+          contractId,
+        },
+      });
+    }
+
     res.json({
       success: true,
       data: {
-        scheduleId: Number(req.params.id),
+        scheduleId: Number(scheduleId),
         claimableAmount: 0,
         note: 'Set VESTING_CONTRACT_ID to query live contract.',
       },

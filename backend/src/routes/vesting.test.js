@@ -1,7 +1,7 @@
 'use strict';
 
 const request = require('supertest');
-const { StrKey } = require('@stellar/stellar-sdk');
+const { Keypair, nativeToScVal, scValToNative, StrKey } = require('@stellar/stellar-sdk');
 
 // Stub stellar service before requiring the app so routes don't need real RPC.
 jest.mock('../services/stellar', () => ({
@@ -10,6 +10,8 @@ jest.mock('../services/stellar', () => ({
   NETWORK_PASSPHRASE: 'Test SDF Network ; September 2015',
   RPC_URL: 'https://soroban-testnet.stellar.org',
 }));
+
+const { simulateContractCall } = require('../services/stellar');
 
 // Generate a valid Stellar public key for use in test fixtures.
 const VALID_ADDRESS = StrKey.encodeEd25519PublicKey(Buffer.alloc(32, 1));
@@ -47,11 +49,55 @@ describe('Vesting routes', () => {
 
   // ── GET /claimable/:id ─────────────────────────────────────────────────────
   describe('GET /api/vesting/claimable/:id', () => {
-    it('returns claimable stub', async () => {
+    it('returns claimable stub when contract configuration is absent', async () => {
+      const previousContractId = process.env.VESTING_CONTRACT_ID;
+      const previousSourceSecret = process.env.SOURCE_SECRET_KEY;
+      simulateContractCall.mockClear();
+      delete process.env.VESTING_CONTRACT_ID;
+      delete process.env.SOURCE_SECRET_KEY;
+
       const res = await request(app).get('/api/vesting/claimable/1');
+
+      if (previousContractId === undefined) delete process.env.VESTING_CONTRACT_ID;
+      else process.env.VESTING_CONTRACT_ID = previousContractId;
+      if (previousSourceSecret === undefined) delete process.env.SOURCE_SECRET_KEY;
+      else process.env.SOURCE_SECRET_KEY = previousSourceSecret;
+
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data).toHaveProperty('claimableAmount');
+      expect(res.body.data.claimableAmount).toBe(0);
+      expect(res.body.data).toHaveProperty('note');
+      expect(simulateContractCall).not.toHaveBeenCalled();
+    });
+
+    it('simulates get_claimable and returns the parsed on-chain amount', async () => {
+      const previousContractId = process.env.VESTING_CONTRACT_ID;
+      const previousSourceSecret = process.env.SOURCE_SECRET_KEY;
+      const contractId = 'CTEST0000000000000000000000000000000000000000000000000000';
+      const sourceSecret = Keypair.random().secret();
+      simulateContractCall.mockClear();
+      process.env.VESTING_CONTRACT_ID = contractId;
+      process.env.SOURCE_SECRET_KEY = sourceSecret;
+      simulateContractCall.mockResolvedValueOnce({
+        result: { retval: nativeToScVal(42000n, { type: 'i128' }) },
+      });
+
+      const res = await request(app).get('/api/vesting/claimable/1');
+
+      if (previousContractId === undefined) delete process.env.VESTING_CONTRACT_ID;
+      else process.env.VESTING_CONTRACT_ID = previousContractId;
+      if (previousSourceSecret === undefined) delete process.env.SOURCE_SECRET_KEY;
+      else process.env.SOURCE_SECRET_KEY = previousSourceSecret;
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.claimableAmount).toBe('42000');
+      expect(simulateContractCall).toHaveBeenCalledWith(expect.objectContaining({
+        contractId,
+        method: 'get_claimable',
+        args: [expect.anything()],
+        sourceKeypair: expect.any(Object),
+      }));
+      expect(scValToNative(simulateContractCall.mock.calls[0][0].args[0])).toBe(1n);
     });
   });
 
