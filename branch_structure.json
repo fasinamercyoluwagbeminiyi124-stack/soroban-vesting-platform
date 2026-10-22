@@ -1,0 +1,18 @@
+{
+  "default_branch": "main",
+  "branches": [
+    "main",
+    "origin",
+    "security/issue-82-add-cargo-audit-step-to-ci-for-dependency"
+  ],
+  "parent": {
+    "main": null,
+    "origin": "main",
+    "security/issue-82-add-cargo-audit-step-to-ci-for-dependency": "main"
+  },
+  "order": [
+    "main",
+    "origin",
+    "security/issue-82-add-cargo-audit-step-to-ci-for-dependency"
+  ]
+}
