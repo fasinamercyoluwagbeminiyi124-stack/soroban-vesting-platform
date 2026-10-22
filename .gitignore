@@ -2,8 +2,6 @@
 target/
 
 # Environment
-.env
-.env.local
 .env.*.local
 
 # Node
@@ -25,7 +23,7 @@ logs/
 Thumbs.db
 
 # Editor
-.vscode/
 .idea/
 *.swp
 *.swo
+config.bat
